@@ -1,0 +1,230 @@
+---
+title: "Assignment 5"
+author: "Ian Tongs"
+date: "27/04/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(fpp3)
+library(forecast)
+```
+
+# Section 8.8 Buildup Exercises:
+
+## Question 2:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+simple_exponential_smoothing <- function(y, alpha, level){
+  t <- length(y)
+  l <- numeric(t + 1) # numeric creates a vector of zeroes of length t+1 (+1 for the forecast)
+  l[1] <- level
+  for (i in 2:(t+1)) {
+    l[i] <- alpha * y[i-1] + (1 - alpha) * l[i - 1]
+  }
+  fcast <- l[t + 1]
+  return(fcast)
+}
+
+y <- c(11,13,12,10,15,16,14)
+
+testfit <- ses(y, h=1)
+
+alpha <- testfit$model$par[1]
+level_0 <- testfit$model$par[2]
+
+simple_exponential_smoothing(y, alpha, level_0)
+
+testfit
+
+```
+
+
+
+
+## Question 3:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+SSE_SES <- function(y, par){
+  alpha <- par[1]
+  level <- par[2]
+  t <- length(y)
+  l <- numeric(t + 1) # numeric creates a vector of zeroes of length t+1 (+1 for the forecast)
+  l[1] <- level
+  for (i in 2:(t+1)) {
+    l[i] <- alpha * y[i-1] + (1 - alpha) * l[i - 1]
+  }
+  SSE <- 0
+  for (i in 1:t) {
+    SSE <- SSE + (y[i] - l[i])^2
+  }
+  return (SSE)
+}
+
+y <- c(11,13,12,10,11)
+#alpha <- 0.25
+#level <- 10
+
+#SSE_SES(y, alpha, level)
+
+optimised <- optim(par=c(0.5,y[1]), fn=SSE_SES, y=y)
+optimised$par
+
+testfit <- ses(y, h=1)
+testfit$model$par
+
+
+
+SSE_SES_aux2 <- function(y, par){
+  error <- 0
+  SSE <- 0
+  alpha <- par[1]
+  l0 <- par[2]
+  y_hat <- l0
+ 
+    for(index in 1:length(y)){
+  error <- y[index] - y_hat
+    SSE <- SSE + error^2
+  
+    y_hat <- alpha*y[index] + (1 - alpha)*y_hat 
+  }
+ 
+  return(SSE)
+}
+
+optimised <- optim(par=c(0.5,y[1]), fn=SSE_SES_aux2, y=y)
+optimised$par
+
+# ts_y <- as_tsibble(y)
+# 
+# fit <- ts_y %>%
+#   model(ETS(y ~ error("A") + trend("N") + season("N"), opt_crit = "mse"))
+# fc <- fit %>%
+#   forecast(h = 5)
+
+```
+
+
+
+    t <- length(y)
+    l <- numeric(t + 1) # numeric creates a vector of zeroes of length t+1 (+1 for the forecast)
+    l[1] <- level
+    for (i in 2:(t+1)) {
+      l[i] <- alpha * y[i-1] + (1 - alpha) * l[i - 1]
+    }
+    fcast <- l[t + 1]
+    return(fcast)
+
+
+
+    alpha <- par[1]
+    level <- par[2]
+    t <- length(y)
+    l <- numeric(t + 1) # numeric creates a vector of zeroes of length t+1 (+1 for the forecast)
+    l[1] <- level
+    for (i in 2:(t+1)) {
+      l[i] <- alpha * y[i-1] + (1 - alpha) * l[i - 1]
+    }
+    SSE <- 0
+    for (i in 1:t) {
+      SSE <- SSE + (y[i] - l[i])^2
+    }
+    return (SSE)
+
+# Assignment Proper:
+
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+simple_exponential_smoothing_function <- function(y) {
+  
+  # Auxiliary function for smoothing with a given alpha an initial level
+  simple_exponential_smoothing_auxiliary <- function(y, alpha, level){
+    t <- length(y)
+    l <- numeric(t + 1) # numeric creates a vector of zeroes of length t+1 (+1 for the forecast)
+    l[1] <- level
+    for (i in 2:(t+1)) {
+      l[i] <- alpha * y[i-1] + (1 - alpha) * l[i - 1]
+    }
+    fcast <- l[t + 1]
+    return(fcast)
+  }
+  
+  # Returns the value of the SSE for the SES with par = c(alpha, level) )
+  SSE_SES_aux <- function(y, par){
+    alpha <- par[1]
+    level <- par[2]
+    t <- length(y)
+    l <- numeric(t + 1) # numeric creates a vector of zeroes of length t+1 (+1 for the forecast)
+    l[1] <- level
+    for (i in 2:(t+1)) {
+      l[i] <- alpha * y[i-1] + (1 - alpha) * l[i - 1]
+    }
+    SSE <- 0
+    for (i in 1:t) {
+      if (alpha>0) {
+        SSE <- SSE + (y[i] - l[i])^2
+      } else {
+        SSE <- SSE + (y[i])^2
+      }
+    }
+    return (SSE)
+  }
+  
+  # Optimise the parameters for the forecast:
+  optimised <- optim(par=c(0.6, y[1]), fn=SSE_SES_aux, y=y)
+  alpha <- optimised$par[1]
+  level_0 <- optimised$par[2]
+  
+  print(optimised$par)
+  print(SSE_SES_aux(y, optimised$par))
+  print(SSE_SES_aux(y, fit1$model$par))
+  
+  # Get the one step ahead forecast
+  pred_val <- simple_exponential_smoothing_auxiliary(y, alpha, level_0)
+  
+  # As this is an SES model, all ten predictions are equal, so:
+  forecast_vector <- numeric(10)
+  for (i in 1:10) {
+    forecast_vector[i] <- pred_val
+  }
+  
+  # Return the forecast vector
+  return (forecast_vector)
+}
+  
+y <- c(11,13,12,10,15,16,14)
+  
+
+simple_exponential_smoothing_function(y)       # Choose a y to get this to work
+
+
+# # create a tsibble w/o a key
+# test_y <- tsibble(
+#   date = as.Date("2017-01-01") + 0:6,
+#   value = c(11,13,12,10,15,16,14)
+# )
+# 
+# # Estimate parameters
+# fit <- test_y %>%
+#   model(ETS(value ~ error("A") + trend("N") + season("N"), opt_crit = "mse"))
+# fc <- fit %>%
+#   forecast(h = 10)
+# 
+# report(fit)
+# 
+# fc
+
+fit1 <- ses(y, h=1)
+fit1
+fit1$model$SSE
+fit1$model$par
+
+```
+
+
+
+# To Do:
+- Q2 AND Q3 from 8.8 are good for the assignment
+- want: want a time series y, an alpha and a level and then does the exponential smothing
+- make a script version

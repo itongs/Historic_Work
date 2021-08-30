@@ -1,0 +1,89 @@
+---
+title: "Assignment 3"
+author: "Ian Tongs"
+date: "03/04/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# AusRetail Data Decomposition
+ 
+## Import Data:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+# Use your student ID as the seed
+library(fpp3)
+set.seed(27765369)
+myseries <- aus_retail %>%
+  filter(
+    `Series ID` == sample(aus_retail$`Series ID`,1),
+    Month < yearmonth("2018 Jan")
+  )
+```
+
+
+## Box-Cox Transformation:
+
+**Lambda = 1:**
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+lambda = 1
+
+myseries %>%
+  autoplot(box_cox(Turnover, lambda)) + ggtitle("Autoplot of myseries") +
+  xlab("Date") + ylab("Turnover ($Millions)")
+```
+
+It is worth noting that the periodicity in the data is monotonically increasing (more or less) so the box-cox transformation may be applied.
+
+
+**Lambda = -0.3:**
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+lambda = -0.3
+
+myseries %>%
+  autoplot(box_cox(Turnover, lambda)) + ggtitle("Autoplot of transformed myseries with lambda = -0.3") +
+  xlab("Date") + ylab("Turnover ($Millions)")
+```
+
+This value of lambda produces roughly consistent periodic variance over the time series so it is selected as lambda. To check we can compare with an optimised lambda via the guerro feature:
+
+**Optimised Lambda:**
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+myseries %>%                        # Calculate \lambda automatically
+  features(Turnover, features = guerrero) %>%
+  pull(lambda_guerrero) -> optimal_lambda
+optimal_lambda
+```
+
+Thus, -0.3 is a very good rough value for lambda to transform our data by (given the optimised lambda is -0.2932).
+
+
+## STL Decomposition:
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+lambda = -0.3
+
+myseries %>%
+  mutate(box_cox = box_cox(Turnover, lambda)) -> myseries_transformed
+```
+
+**Plot:**
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries_transformed %>%
+  model(STL(Turnover ~ trend(window=21) + season(window='periodic'),
+    robust = TRUE)) %>%
+  components() %>%
+  autoplot()
+```
+
+**Explanation:**
+
+From the plot, we can see that the STL decomposition has some trouble with the series I have provided.  The trend component accounts for the majority of the movement in the series.  While a significant portion of the series can be explained via seasonality in the data throughout the year, the remainder accounts for a larger portion of the series than the seasonality in the earliest and latest observed years.  The remainder at these times has clear periodicity at around these times. This could be due to some sort of structural break, which appears in the original data at around these times (in 1997 and 2008 - recessions funnily enough).

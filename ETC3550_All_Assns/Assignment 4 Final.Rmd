@@ -1,0 +1,93 @@
+---
+title: "Assignment 4"
+author: "Ian Tongs"
+date: "21/04/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Pigs Slaughtered Forecasting:
+ 
+ Import Data:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+# Use your student ID as the seed
+library(fpp3)
+pigs_series <- aus_livestock %>%
+  filter(
+    `State` == 'New South Wales') %>%
+  filter(
+    `Animal` == 'Pigs')
+```
+
+
+## Create Training Data:
+
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+pigs_training <- pigs_series %>%
+  filter(Month <= yearmonth("2014 Dec"))
+```
+NB: The last recorded value of this series is in Dec 2018, so excluding the last 4 years would take us back to Dec 2014.
+
+
+## Seasonal Naive Forecast:
+
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+pigs_fit <- pigs_training %>%
+  model('Seasonal naive' = SNAIVE(Count)) 
+pigs_fc <- pigs_fit %>%
+  forecast(h = "4 year")
+autoplot(pigs_fc) + 
+  geom_line(data = pigs_training, aes(x = Month, y = Count)) +
+  xlab('Date') +
+  ylab('Count of Pigs Slaughtered') +
+  scale_y_continuous(n.breaks = 10) + 
+  labs(title="Forecast by Seasonal Naive (Blue) of pigs slaughtered in NSW") 
+```
+
+
+## Checking the Residuals:
+
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+pigs_fit %>%
+  select('Seasonal naive') %>%
+  gg_tsresiduals() + 
+  labs(title="Residuals plots for a forecast by Seasonal Naive of pigs slaughtered in NSW") 
+```
+
+While the mean of the residuals appears close to zero and the distribution of its values appears normal, the first 11 lags of the Autocorrelation Function Plot are beyond our 95% confidence interval for uncorrelated data which indicates that the series is not white noise. Any reasonable hypothesis test would confirm this, and thus we can conclude that the Seasonal Naive method produces forecasts that do not appear to account for all available information in the time series.
+
+
+
+
+## Plotting the Forecast and computing the MASE:
+
+
+**Plot of the Forecast:**
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+pigs_actual <- pigs_series %>%
+  filter(Month > yearmonth("2014 Dec"))
+
+autoplot(pigs_fc) + 
+  geom_line(data = pigs_actual, aes(x = Month, y = Count), color = "red") +
+  xlab('Date') +
+  ylab('Count of Pigs Slaughtered') +
+  scale_y_continuous(n.breaks = 10) + 
+  labs(title="Actual values (Red) versus SNAIVE Forecasted values (Blue)") 
+```
+
+
+**MASE:**
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+accuracy(pigs_fc, pigs_series)
+```
+
+Thus, the Mean Absolute Square Error for the test period is 0.660995.

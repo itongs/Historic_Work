@@ -1,0 +1,76 @@
+---
+title: "Week 2 Assignment"
+author: "Ian Tongs"
+date: "18/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(fpp3)
+```
+
+# AusRetail Plotting
+ 
+## Import Data:
+
+```{r}
+# Use your student ID as the seed
+library(fpp3)
+set.seed(27765369)
+myseries <- aus_retail %>%
+  filter(
+    `Series ID` == sample(aus_retail$`Series ID`,1),
+    Month < yearmonth("2018 Jan")
+  )
+```
+Thus, via my student ID, Tasmanian Other Recreational Goods Retailing (Series ID = A3349591C) is the time series viewed in my assignment
+
+
+## Autoplot:
+
+*Plot:*
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries %>%
+  autoplot(Turnover)
+```
+
+*Explanation:*
+
+This plot displays a clear positive trend. There appears to be seasonal peaks as well. In the mid 90s this seasonality seem to have become more distinct, with the peaks growing substantially relative to the rest of the year. 
+
+
+## GG_Season:
+
+*Plot:*
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries %>%
+  gg_season(Turnover)
+```
+
+*Explanation:*
+
+This plot confirms a strong season peak in december with the rest of the year mainly consistent. This is potentially due to a peak in purchases in and leading up to christmas. Year on year growth is also clearly visible, with later years outperforming earlier years.
+
+
+
+
+## GG_Subseries:
+
+*Plot:*
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries %>%
+  gg_subseries(Turnover)
+```
+
+*Explanation:*
+
+Like in the season plot, here we can clearly see the seasonality in the data with a firm peak in December. Likewise, year on year growth in all months is clearly visible. We can also observe slight falls in most months in the late 90s and around 2008, which would be consistent with economic downturns at that time.
+
+
+
+

@@ -1,0 +1,105 @@
+---
+title: "Assignment 4"
+author: "Ian Tongs"
+date: "16/04/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Pigs Slaughtered Forecasting:
+ 
+ Import Data:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+# Use your student ID as the seed
+library(fpp3)
+pigs_series <- aus_livestock %>%
+  filter(
+    `State` == 'New South Wales') %>%
+  filter(
+    `Animal` == 'Pigs')
+pigs_series <- as_tsibble(pigs_series)
+```
+
+
+## Create Training Data:
+
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+pigs_training <- pigs_series %>%
+  filter(Month <= yearmonth("2014 Dec"))
+```
+
+
+
+## Seasonal Naive Forecast:
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+pigs_training %>%
+  filter(!is.na(Count)) %>%
+  model(Seasonal_naive = SNAIVE(Count)) %>%
+  forecast(h = "4 year") %>%
+  autoplot(pigs_training)
+```
+
+
+## Checking the Residuals:
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+pigs_training %>%
+  filter(!is.na(Count)) %>%
+  model(Seasonal_naive = SNAIVE(Count)) %>%
+  gg_tsresiduals()
+```
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+These graphs demonstrate that the Seasonal Naive method produces forecasts that do not appear to account for all available information in the time series. The mean of the residuals is mostly close to zero and the histogram of the residuals appear to be bell-shaped and therefor could be from a normal distribution. However, the plot of the residuals does not appear as white noise should, with clear evidence of correlation between data. This is further backed up by the Autocorrelation Function Plot, where the first 11 lags are beyond our 95% confidence interval for uncorrelated data. One can be quite certain any appropriate test for autocorrelation would return positive results.
+As a result of this, form the plots above the residuals do not resemble white noise.
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!SHOULD BE ONE SENTENCE, CUT THAT DOWN ^^^^ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+## Plotting the Forecast and computing the MASE:
+
+
+**Plot of the Forecast**
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+pig_fc <- pigs_training %>%
+  filter(!is.na(Count)) %>%
+  model(Seasonal_naive = SNAIVE(Count)) %>%
+  forecast(h = "4 year")
+
+pigs_actual <- pigs_series %>%
+  filter(Month > yearmonth("2014 Dec"))
+
+autoplot(pig_fc) + 
+  geom_line(data = pigs_actual, aes(x = Month, y = Count), color = "red") +
+  xlab('Date') +
+  ylab('Count of Pigs Slaughtered') +
+  scale_y_continuous(n.breaks = 10) + 
+  labs(title="Actual values (Red) versus SNAIV Forecasted values (Blue)") 
+```
+
+
+**MASE:**
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+accuracy(pig_fc, pigs_series)
+```
+
+
+### To Do: 
+- MASE Values
+- Adding Titles and Axis Lables to other plots
+- Set code to echo true

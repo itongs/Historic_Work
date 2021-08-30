@@ -1,0 +1,623 @@
+---
+title: "Retail Project"
+author: "Ian Tongs"
+date: "23/05/2020"
+output:
+  bookdown::html_document2:
+    fig_height: 5
+    fig_width: 8
+    toc: yes
+    toc_depth: 1
+    toc_float:
+      collapsed: false
+    number_sections: false
+    code_folding: show
+    theme: readable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Import:
+
+
+```{r}
+suppressWarnings(RNGversion("3.5.3"))   # This is to deal with changed RNG in 3.6, as indicated in the forums
+library(fpp3)
+set.seed(27765369)
+myts <- aus_retail %>%
+  filter(
+    `Series ID` == sample(aus_retail$`Series ID`,1),
+    Month < yearmonth("2018 Jan")
+  )
+myseries <- myts %>% 
+  select(Month, Turnover)
+```
+Thus, via my student ID, Tasmanian Other Recreational Goods Retailing (Series ID = A3349591C) is the time series viewed in my retail project
+
+
+
+
+
+
+# Features of the data:
+
+> [ Short summary of the data and it's structure ]
+
+## A short discussion of my series
+
+Sport and camping equipment retailing (4241)
+Entertainment media retailing (4242)
+Toy and game retailing (4243)
+
+All discretionary spending
+
+
+## Autoplot:
+
+*Plot:*
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries %>%
+  autoplot(Turnover)
+```
+
+*Explanation:*
+
+This plot displays a clear positive trend. There appears to be seasonal peaks as well. In the mid 90s this seasonality seem to have become more distinct, with the peaks growing substantially relative to the rest of the year. 
+
+
+## GG_Season:
+
+*Plot:*
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries %>%
+  gg_season(Turnover)
+```
+
+*Explanation:*
+
+This plot confirms a strong season peak in december with the rest of the year mainly consistent. This is potentially due to a peak in purchases in and leading up to christmas. Year on year growth is also clearly visible, with later years outperforming earlier years.
+
+
+## GG_Subseries:
+
+*Plot:*
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries %>%
+  gg_subseries(Turnover)
+```
+
+*Explanation:*
+
+Like in the season plot, here we can clearly see the seasonality in the data with a firm peak in December. Likewise, year on year growth in all months is clearly visible. We can also observe slight falls in most months in the late 90s and around 2008, which would be consistent with economic downturns at that time.
+
+
+
+
+
+
+
+# Transformations and differencing:
+
+> [ Short summary of the transformations used ]
+
+```{r echo = FALSE, message=FALSE, warning=FALSE} 
+myseries %>%
+  autoplot(Turnover) +
+  labs(y = "Turnover (million $AUD)", x = "Time (Years)",
+       title = myseries$Industry[1],
+       subtitle = myseries$State[1])
+```
+
+!!!!
+Try log first here
+
+
+
+
+**Box-Cox Transform:**
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+lambda = -0.65
+
+myseries %>%
+  autoplot(box_cox(Turnover, lambda)) + ggtitle("Autoplot of transformed myseries with lambda = -0.65") +
+  xlab("Date") + ylab("Turnover ($Millions)")
+```
+
+Find the exact value for Lambda and then set a series to this
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+lambda_ <- myseries %>%
+  features(Turnover, features = guerrero) %>%
+  pull(lambda_guerrero) 
+
+myseries_bc <- myseries %>%
+  mutate(box_cox_turnover = box_cox(Turnover, lambda_))
+```
+
+**Residuals and Differencing:**
+
+First let us plot the transformed data to see if we need to difference it:
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries_bc %>%
+  gg_tsdisplay(box_cox_turnover, plot_type='partial')
+```
+
+We can now test for unit roots via the KPSS test:
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries_bc %>% 
+  features(box_cox_turnover, unitroot_kpss)
+```
+
+As the ...!
+
+we can see ...!
+
+!!!! do the ndiffs test
+
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries_bcd <- myseries_bc %>% 
+  mutate(d_box_cox_turnover = difference(difference(box_cox_turnover, 12), 1))
+
+myseries_bcd %>%
+  gg_tsdisplay(d_box_cox_turnover, plot_type='partial', lag_max = 48)
+```
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+myseries_bcd %>% 
+  features(d_box_cox_turnover, unitroot_kpss)
+```
+
+
+
+From the PACF we get that AR(p=4 or 2) in the nonseasonal component
+From the ACF we get MA(q = 4 or 1)
+Seasonal seems to be AR(2) and MA(1)
+
+
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE} 
+# Splitting a training and test set from the data
+training_data <- myseries %>%
+  filter(Month < yearmonth("2016 Jan"))
+```
+
+
+
+
+
+
+
+# Methodology:
+
+> [ Short summary of methods used in this analysis ]
+
+
+
+*ETS:*
+
+ETS Models utilise combination of level, slope and trend to produce forecasts. ETS models combine these three elements either multiplicatively or additively (or through their absence). Despite this apparent simplicity, ETS models can produce very sophisticated results and are very flexible. ETS models also posses substantial interpretability, as they produce forecasts around often observeable features in the input data, such as trend and stationarity.  
+
+
+*ARIMA:*
+
+The archetypal time series model, ARIMA models use a combination of Autoregressive and Moving Average components on stationary datasets to produce forecasts. This focus on the data generating function side of the time series requires the data to be made stationary before it can be used however, necessitating that differences be taken to make the useable for this model type, to avoid unit roots in the data.
+
+It is worth noting thath some ARIMA and ETS models are equivalent, though the vast majority are distinct from the other model type.
+
+
+
+**AICc:**
+
+The Corrected Akaike’s Information Criterion is utilised in this report to evaluate models on the test dataset. AICc evaluates the log likelihood (penalised in the corrected AIC for the number of model coefficients) of the model on the training dataset, which may be used to evaluate models of the same type (i.e.: different ETS models) against each other. AICc is especially good at dealing with small sample bias. This is what the AICc has been used for in this report. The AICc is not, however, for comparing models of different structural types (eg: compare an ETS with an ARIMA). This evaluation must be performed via the RMSE on the test dataset.
+
+
+
+**RMSE: **
+
+The main evaluation metric I have used to assess my models against the test set has been the RMSE. This evaluation metric penalises large error values more highly than other metrics like MAPE or MASE thanks to the squared term, making this a superior evaluation metric. As lower values indicate a superior model, the best choice of model is the one the minimises the RMSE on the test dataset.
+
+Using the test dataset to evaluate my models is very important to avoide overfitting. Overfitting occurs when a model is developed that fits the training dataset to an extent where the model overspecifies to that exact dataset. Using the test set to evaluate my models avoids this.
+
+
+
+
+
+
+
+
+
+# Model selection:
+
+> [ Description of various models tried and compared ]
+
+Lambda Selection:
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+# Basic Transform:
+training_data %>%                        # Calculate lambda automatically
+  features(Turnover, features = guerrero) %>%
+  pull(lambda_guerrero) -> optimal_lambda
+
+# Add in the box cox transformation:
+training_data <- training_data %>%
+  mutate(Turn_bc = box_cox(Turnover, lambda_))
+```
+
+Forecasts Set:
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+# Fit all ETS models:
+fit_all_ETS <- training_data %>%  
+  model(
+    ETS_ANN = ETS(box_cox(Turnover, lambda) ~ error("A") + trend("N") + season("N")),
+    ETS_AAN = ETS(box_cox(Turnover, lambda) ~ error("A") + trend("A") + season("N")),
+    ETS_AAA = ETS(box_cox(Turnover, lambda) ~ error("A") + trend("A") + season("A")),
+    ETS_ANA = ETS(box_cox(Turnover, lambda) ~ error("A") + trend("N") + season("A")),
+    ETS_AAdN = ETS(box_cox(Turnover, lambda) ~ error("A") + trend("Ad") + season("N")),
+    ETS_AAdA = ETS(box_cox(Turnover, lambda) ~ error("A") + trend("Ad") + season("A"))
+  )
+
+fit_all_ETS_nontransformed <- training_data %>%  
+  model(
+    ETS_MNA = ETS(Turnover ~ error("M") + trend("N") + season("A")),
+    ETS_MNN = ETS(Turnover ~ error("M") + trend("N") + season("N")),
+    ETS_MNM = ETS(Turnover ~ error("M") + trend("N") + season("M")),
+    ETS_MAA = ETS(Turnover ~ error("M") + trend("A") + season("A")),
+    ETS_MAN = ETS(Turnover ~ error("M") + trend("A") + season("N")),
+    ETS_MAM = ETS(Turnover ~ error("M") + trend("A") + season("M")),
+    ETS_MAdN = ETS(Turnover ~ error("M") + trend("Ad") + season("N")),
+    ETS_MAdA = ETS(Turnover ~ error("M") + trend("Ad") + season("A")),
+    ETS_MAdM = ETS(Turnover ~ error("M") + trend("Ad") + season("M"))
+  )
+
+# Fit all ARIMA models
+fit_all_ARIMA <- training_data %>%  
+  model(
+    ARIMA_112_211_logical = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(1,1,2) + PDQ(2,1,1)),
+    ARIMA_111_211 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(1,1,1) + PDQ(2,1,1)),
+    ARIMA_113_211 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(1,1,3) + PDQ(2,1,1)),
+    ARIMA_212_211 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(2,1,2) + PDQ(2,1,1)),
+    ARIMA_012_211 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(0,1,2) + PDQ(2,1,1)),
+    ARIMA_112_311 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(1,1,2) + PDQ(3,1,1)),
+    ARIMA_112_011 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(1,1,2) + PDQ(0,1,1)),
+    ARIMA_112_210 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(1,1,2) + PDQ(2,1,0)),
+    ARIMA_111_210 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(1,1,1) + PDQ(2,1,0)),
+    ARIMA_012_210 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(0,1,2) + PDQ(2,1,0)),
+    ARIMA_112_212 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(1,1,2) + PDQ(2,1,2)),
+    ARIMA_102_201 = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(1,1,1) + PDQ(2,1,1))
+  )
+
+```
+
+Evaluate based on AICc:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+fit_all_ETS %>%
+  glance %>%
+  arrange(AICc) %>%
+  select(.model, AICc)
+
+fit_all_ETS_nontransformed %>%
+  glance %>%
+  arrange(AICc) %>%
+  select(.model, AICc)
+
+fit_all_ARIMA %>%
+  glance %>%
+  arrange(AICc) %>%
+  select(.model, AICc)
+```
+
+
+Forecast Accuracy:
+
+
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+fc_all_ETS <- fit_all_ETS %>%
+  forecast(h="2 years")
+
+fc_all_ETS_nt <- fit_all_ETS_nontransformed %>%
+  forecast(h="2 years")
+
+fc_all_ARIMA <- fit_all_ARIMA %>%
+  forecast(h="2 years")
+
+
+fc_all_ETS %>%
+  accuracy(myseries) %>%
+  arrange(RMSE) %>%
+  select(.model, RMSE)
+
+fc_all_ETS_nt %>%
+  accuracy(myseries) %>%
+  arrange(RMSE) %>%
+  select(.model, RMSE)
+
+fc_all_ARIMA %>%
+  accuracy(myseries) %>%
+  arrange(RMSE) %>%
+  select(.model, RMSE)
+
+
+fit_all_ETS_nontransformed %>%
+  select(ETS_MAM) %>%
+  forecast(h="2 years") %>%
+  autoplot(filter(myseries, Month >= yearmonth("2016 Jan")), level = NULL)
+
+fit_all_ETS %>%
+  select(ETS_AAdA) %>%
+  forecast(h="2 years") %>%
+  autoplot(filter(myseries, Month >= yearmonth("2016 Jan")), level = NULL)
+ 
+fit_all_ARIMA %>%
+  select(ARIMA_111_210) %>%
+  forecast(h="2 years") %>%
+  autoplot(filter(myseries, Month >= yearmonth("2016 Jan")), level = NULL)
+```
+
+
+
+
+
+
+Check the LBJ for the best few for each:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+fit_all_ARIMA %>% 
+  select(ARIMA_auto) %>% 
+  augment() %>%
+  features(.resid, ljung_box, lag = 24, dof = 6)
+
+fit_all_ARIMA %>% 
+  select(ARIMA_102_201) %>% 
+  augment() %>%
+  features(.resid, ljung_box, lag = 24, dof = 6)
+
+fit_all_ETS %>% 
+  select(ETS_auto) %>% 
+  augment() %>%
+  features(.resid, ljung_box, lag = 24, dof = 15)
+
+fit_all_ETS %>% 
+  select(ETS_MAM) %>% 
+  augment() %>%
+  features(.resid, ljung_box, lag = 24, dof = 20)
+# include all values, incude alpha, beta, gamma, phi, and the initial
+```
+
+
+
+
+Glances:
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+fit_all_ETS %>%
+  glance()
+
+fit_all_ARIMA %>%
+  glance()
+```
+
+
+Glances:
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+fit_all_ETS %>% select(ETS_auto) %>% gg_tsresiduals()
+fit_all_ETS %>% select(ETS_auto) %>% report()
+fit_all_ETS %>% select(ETS_MAdM) %>% report()
+
+
+fit_all_ARIMA %>% select(ARIMA_auto) %>% gg_tsresiduals()
+fit_all_ARIMA %>% select(ARIMA_auto) %>% report()
+
+```
+
+
+
+LjB Tests:
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+fit_all_ARIMA %>% 
+  select(ARIMA_auto) %>% 
+  augment() %>%
+  features(.resid, ljung_box, lag = 24, dof = 6)
+
+fit_all_ARIMA %>% 
+  select(ARIMA_102_201) %>% 
+  augment() %>%
+  features(.resid, ljung_box, lag = 24, dof = 6)
+
+fit_all_ETS %>% 
+  select(ETS_auto) %>% 
+  augment() %>%
+  features(.resid, ljung_box, lag = 24, dof = 15)
+
+fit_all_ETS %>% 
+  select(ETS_MAM) %>% 
+  augment() %>%
+  features(.resid, ljung_box, lag = 24, dof = 20)
+# include all values, incude alpha, beta, gamma, phi, and the initial
+```
+
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+fit_all_ETS %>% 
+  augment() %>%
+  features(.resid, ljung_box, lag = 24, dof = 20)
+# include all values, incude alpha, beta, gamma, phi, and the initial
+```
+
+
+
+
+# Final Model Comparison:
+
+> [ The chosen ARIMA and ETS models and their core metrics ]
+
+
+## Arima:
+
+
+[Formal model write-up]
+
+
+
+*Core Stats:*
+
+**Ljung-Box Test:**
+
+**ACF Plot:**
+
+
+## ETS:
+
+
+[Formal model representation]
+
+[Check allowed regions - slide 64]
+
+
+*Core Stats:*
+
+**Ljung-Box Test:**
+
+**ACF Plot:**
+
+## Commentary:
+
+[Ensure I mention the test set and what this implies]
+
+Name model if it has a name in full
+
+
+
+
+
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE} 
+# Get full up to date data from the ABS website
+
+suppressWarnings(RNGversion("3.5.3"))   # This is to deal with changed RNG in 3.6, as indicated in the forums
+set.seed(27765369)
+myseriesid <- sample(aus_retail$`Series ID`, 1)
+
+new_data <- readabs::read_abs(series_id = myseriesid) %>%
+  transmute(Month = yearmonth(date), Turnover = value) %>%
+  as_tsibble(index = Month)
+```
+
+
+
+
+
+
+
+# Out of sample Forecasts and 80% Prediction Intervals:
+
+## Model Application:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+# Basic Transform:
+myseries %>%                        # Calculate lambda automatically
+  features(Turnover, features = guerrero) %>%
+  pull(lambda_guerrero) -> optimal_lambda
+
+# Fit all ETS models:
+fit_best <- myseries %>%  
+  model(
+    ETS = ETS(box_cox(Turnover, lambda) ~ error("A") + trend("Ad") + season("A")),
+    ETS_other = ETS(Turnover ~ error("M") + trend("A") + season("M")),
+    ARIMA = ARIMA(box_cox(Turnover, lambda) ~ 0 + pdq(1,1,1) + PDQ(2,1,0))
+  )
+```
+
+
+## Forecast Accuracy:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+fc_best <- fit_best %>%
+  forecast(h="2 years", level=80)
+
+
+
+fc_best %>%
+  autoplot(filter(new_data, Month > yearmonth("2016 Jan"))) +
+  ylim(NA, 100)
+
+fc_best %>%
+  autoplot(filter(new_data, Month > yearmonth("2018 Jan")), level = NULL)
+
+
+fc_best %>%
+  accuracy(new_data) %>%
+  arrange(RMSE) %>%
+  select(.model, RMSE)
+
+myseries %>%
+  filter(Month > yearmonth("2016 Jan")) %>%
+  autoplot(Turnover)
+
+```
+
+
+
+## Forecast Plot on Out of Sample Data:
+
+
+
+[Commentary]
+
+
+```{r echo = TRUE, message=FALSE, warning=FALSE} 
+#fable_arima <- fit1  %>% forecast(h = "2 years")
+
+intervals1 = tibble(interval =hilo(fc_best$.distribution, 80), Month = fc_best$Month)
+intervals1
+
+```
+
+
+
+
+
+
+# Discussion:
+
+[Commentary on benefits and limitations of the models]
+
+Benefits:
+- ETS: deals with heteroskedasticity and nonstationarity in the data easily - not dependent on accurate transformations
+- ETS: parameters aid us in graphical interpretation of the data and what contributes to the forecast
+- ARIMA: provides insight into the data generating function behind the dataset
+- Point forecasts for those are pretty good
+
+
+Limitations:
+- ARIMA takes longer and could potentially miss the most accurate model
+- ARIMA relies on the transformations in the modelebing optimal/correct - also losing information in the transformation
+- Serial correlation in the residuals - if it exists
+  - Model isn't capturing all the information in the data
+- Doesn't incorporate exogenous predictors - Dynamic Regression on more variables could capture more information in the data
+  - EG: Cash rate would be useful for any of our examples, especially discretionary spending like this
+  - Also can be extended to a lack of dummies for things like festivals that may occur in 
+- Limitations of long term forecasts
+  - ETS Slide 76
+  - Check ARIMA
+- Forecast intervals quite wide
+- Both models can only have one seasonal period - though only a monthly cycle is reasonable for this data
+
+
+
+
+
+
+
+

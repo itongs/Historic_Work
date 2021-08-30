@@ -1,0 +1,75 @@
+---
+title: "Assignment 6"
+author: "Ian Tongs"
+date: "10/05/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# AusRetail Data Modelling
+ 
+## Import Data:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+# Use your student ID as the seed
+library(fpp3)
+set.seed(27765369)
+myseries <- aus_retail %>%
+  filter(
+    `Series ID` == sample(aus_retail$`Series ID`,1),
+    Month < yearmonth("2018 Jan")
+  )
+```
+
+
+
+
+# Part 1:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+fit <- myseries %>%
+  model(ETS(Turnover))
+report(fit)
+```
+
+The best ETS model for this data is the ETS(M,A,M), with an AICc of $3697.483$.
+
+
+# Part 2:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+# Stretch for cross validaation:
+my_stretch <- myseries %>%
+  stretch_tsibble(.init = 18,.step = 1) %>%
+  filter(.id != max(.id))
+
+
+# Validation modelling:
+valid_fit <- my_stretch %>%
+  model( MAM = ETS(Turnover ~ error("M") + trend("A") + season("M")),
+         MNM = ETS(Turnover ~ error("M") + trend("N") + season("M")),
+         MAdM = ETS(Turnover ~ error("M") + trend("Ad") + season("M"))
+         )
+
+
+# Compute the one step ahead forecast:
+valid_fcst <- valid_fit %>%
+  forecast(h=1)
+
+
+# Accuracy of the fits:
+valid_fcst %>% accuracy(myseries)
+
+
+```
+
+
+
+
+# Part 3:
+
+The best model from the cross-validation is the ETS(M,A,M) model as it has the best (lowest) RMSE computed using the cross validation on the time series. It was also the model selected in Q1. Therefore the ETS(M,A,M) is my preferred model for this dataset.
+
