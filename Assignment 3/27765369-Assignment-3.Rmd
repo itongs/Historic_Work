@@ -1,0 +1,652 @@
+---
+title: "27765369 Assignment 3"
+author: "Ian Tongs"
+date: "18/09/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Import some useful libraries:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+#library(hrbrthemes)
+library(viridis)
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+library(cowplot)
+library(keras)
+library(ggpubr)
+```
+
+
+\pagebreak
+
+# Import Data:
+
+
+```{r echo = TRUE, error=FALSE, message=FALSE, warning=FALSE}
+# Import dataset as specified in the tute:
+mnist <- dataset_mnist()
+x_train <- mnist$train$x
+y_train <- mnist$train$y
+x_test <- mnist$test$x
+y_test <- mnist$test$y
+
+
+## Re-arrange dataset:
+# reshape
+x_train <- array_reshape(x_train, c(nrow(x_train), 784))
+x_test <- array_reshape(x_test, c(nrow(x_test), 784))
+# rescale
+x_train <- x_train / 255
+x_test <- x_test / 255
+
+# Categorise output data:
+y_train
+y_train <- to_categorical(y_train, 10)
+y_train
+y_test <- to_categorical(y_test, 10)
+```
+
+
+
+
+
+
+
+
+
+
+
+\pagebreak
+
+
+# Question 1
+
+> Tyring different network specifics
+
+
+## Part A:
+
+We can calculate the model specified in this question:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE, error=FALSE}
+## Define the model:
+model_1a <- keras_model_sequential() 
+model_1a %>% 
+  layer_dense(units = 128, activation = 'relu', input_shape = c(784)) %>%   # Shrunken hidden layer
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense(units = 64, activation = 'relu')  %>%      # Shrunken hidden layer
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = 10, activation = 'softmax')
+
+# Inspect the defined model:
+# summary(model_1a)
+
+# Compile the model with an appropriate Loss Function and Optimizer:
+model_1a %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+## Training and Fitting the model:
+history_1a <- model_1a %>% fit(
+  x_train, y_train, 
+  epochs = 30, batch_size = 128, 
+  validation_split = 0.2,
+  verbose = 0
+)
+
+augmented_result <- model_1a %>% evaluate(x_test, y_test)
+```
+
+
+
+For comparison's sake we can run the base model we want to compare against:
+
+
+```{r echo = TRUE, message=FALSE, warning=FALSE, error=FALSE}
+## Define the model:
+model_base <- keras_model_sequential() 
+model_base %>% 
+  layer_dense(units = 256, activation = 'relu', input_shape = c(784)) %>% 
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense(units = 128, activation = 'relu') %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = 10, activation = 'softmax')
+
+# Inspect the defined model:
+# summary(model_base)
+
+# Compile the model with an appropriate Loss Function and Optimizer:
+model_base %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+## Training and Fitting the model:
+history_base <- model_base %>% fit(
+  x_train, y_train, 
+  epochs = 30, batch_size = 128, 
+  validation_split = 0.2,
+  verbose = 0
+)
+
+base_result <- model_base %>% evaluate(x_test, y_test)
+```
+
+
+Comparin the results we find that:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+# Base Plot:
+
+plot_base <- plot(history_base) + 
+  ggtitle("Base History Plot:")
+
+
+# Reduced hidden layer nodes plot:
+
+plot_1a <- plot(history_1a) + 
+  ggtitle("Augmented History Plot:")
+
+
+# Plot them together:
+
+ggarrange(plot_base, 
+          plot_1a, 
+          ncol = 1, nrow = 2)
+```
+
+We note that:
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+print(paste("The base model has a validation loss value of: ", base_result[1]))
+
+print(paste("and it also has an accuracy of:", base_result[2]))
+
+
+print(paste("The augmented model has a validation loss value of: ", augmented_result[1]))
+
+print(paste("and it also has an accuracy of:", augmented_result[2]))
+```
+
+
+We observe that the results are similar between the two, though the base model performs slightly better.
+
+
+
+
+## Part B:
+
+
+We can run the model as such:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+## Define the model:
+model_1b <- keras_model_sequential() 
+model_1b %>% 
+  layer_dense(units = 256, activation = 'relu', input_shape = c(784)) %>% 
+  layer_activity_regularization(l1 = 0.01) %>%      # L1 Regularisation
+  layer_dense(units = 128, activation = 'relu') %>%
+  layer_activity_regularization(l1 = 0.01) %>%      # L1 Regularisation
+  layer_dense(units = 10, activation = 'softmax')
+
+# Inspect the defined model:
+# summary(model_1b)
+
+# Compile the model with an appropriate Loss Function and Optimizer:
+model_1b %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+## Training and Fitting the model:
+history_1b <- model_1b %>% fit(
+  x_train, y_train, 
+  epochs = 30, batch_size = 128, 
+  validation_split = 0.2,
+  verbose = 0
+)
+
+regularised_result <- model_1b %>% evaluate(x_test, y_test)
+```
+
+And we can plot the results:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+# L1 Regularised plot:
+
+plot_1b <- plot(history_1b) + 
+  ggtitle("L1 Regularised History Plot:")
+
+
+# Plot them together:
+
+ggarrange(plot_base, 
+          plot_1b, 
+          ncol = 1, nrow = 2)
+```
+
+
+We note that:
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+print(paste("The base model has a validation loss value of: ", base_result[1]))
+
+print(paste("and it also has an accuracy of:", base_result[2]))
+
+
+print(paste("The L1 Regularised model has a validation loss value of: ", regularised_result[1]))
+
+print(paste("and it also has an accuracy of:", regularised_result[2]))
+```
+
+Evidently, the L1 regularised model with dropout layers removed performs less well than the base model, having a higher LOSS value and lower Accuracy.
+
+
+
+
+
+## Part C:
+
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+## Define the model:
+model_1c <- keras_model_sequential() 
+model_1c %>% 
+  layer_dense(units = 256, activation = 'relu', input_shape = c(784)) %>% 
+  layer_dense(units = 128, activation = 'relu') %>%
+  layer_dense(units = 10, activation = 'softmax')
+
+# Inspect the defined model:
+# summary(model_1c)
+
+# Compile the model with an appropriate Loss Function and Optimizer:
+model_1c %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+## Training and Fitting the model:
+history_1c <- model_1c %>% fit(
+  x_train, y_train, 
+  epochs = 30, batch_size = 128, 
+  validation_split = 0.2,
+  # Early stopping clause:
+  callbacks = list(callback_early_stopping(monitor = "val_loss"))
+)
+
+early_cutoff_result <- model_1c %>% evaluate(x_test, y_test)
+```
+
+
+And we can plot the results:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+# Make a data frame for early stop plot:
+
+df_1c_hist <- as.data.frame(history_1c$metrics)
+pad <- history_1c$params$epochs - nrow(df_1c_hist)
+pad_data <- list()
+for (metric in history_1c$params$metrics)
+  pad_data[[metric]] <- rep_len(NA, pad)
+df_1c_hist <- rbind(df_1c_hist, pad_data)
+df_1c_hist$index <- 1:nrow(df_1c_hist)
+
+
+# Plot the regularised data
+
+tl <- ggplot(aes(x = index, y = loss), data = df_1c_hist) +  
+  geom_point(color = "red") + geom_line(color = "red", linetype="dotted")
+vl <- ggplot(aes(x = index, y = val_loss), data = df_1c_hist) +  
+  geom_point(color = "blue") + geom_line(color = "blue")
+ta <- ggplot(aes(x = index, y = accuracy), data = df_1c_hist) +  
+  geom_point(color = "red") + geom_line(color = "red", linetype="dotted")
+va <- ggplot(aes(x = index, y = val_accuracy), data = df_1c_hist) +  
+  geom_point(color = "blue") + geom_line(color = "blue")
+
+plot_1c <- ggarrange(tl,
+                     vl,
+                     ta,
+                     va,
+                     ncol = 2, nrow = 2)
+
+# Plot them together:
+
+ggarrange(plot_base, 
+          plot_1c, 
+          ncol = 1, nrow = 2)
+```
+
+
+
+We note that:
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+print(paste("The base model has a validation loss value of: ", base_result[1]))
+
+print(paste("and it also has an accuracy of:", base_result[2]))
+
+
+print(paste("The Early Cutoff model has a validation loss value of: ", early_cutoff_result[1]))
+
+print(paste("and it also has an accuracy of:", early_cutoff_result[2]))
+```
+
+This gives us a final result that has a slightly lower accuracy than the base model, but a noteably lower LOSS value as well. This is likely a result of reduced overfitting in the early stopping model, which results in comparable accuracy to the base model, with a lower LOSS value
+
+
+
+
+
+
+
+
+
+
+
+
+\pagebreak
+
+
+# Question 2
+
+> Trialling Different Network Parameters
+
+
+## Main Loop of models:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+# Define d:
+d <- c(16,32,64,128)
+
+# Define q:
+q <- c(0,0.25,0.5,0.75)
+
+
+# Create output data frame:
+All_Tested_Models <- data.frame("d" = NA, "q" = NA, "Loss" = NA, "Accuracy" = NA)
+
+
+# Outer Loop for q values for the dropout rate
+for (i in 1:length(q)){
+  
+  # Inner Loop for values of d for the hidden layer size
+  for (j in 1:length(d)){
+    
+    # Start Model:
+    tested_model <- keras_model_sequential()
+    
+    # Define Model:
+    tested_model %>%
+      layer_dense(units = d[j], activation = 'relu', input_shape = c(784)) %>%
+      layer_dropout(rate = q[i]) %>%
+      layer_dense(units = 10, activation = 'softmax')
+    
+    # Compile Model
+    tested_model %>% compile(
+      loss = 'categorical_crossentropy',
+      optimizer = optimizer_rmsprop(),
+      metrics = c('accuracy')
+    )
+    
+    # Analyse History of the Model:
+    tested_history <- tested_model %>% fit(
+      x_train, y_train,
+      epochs = 30, batch_size = 128,
+      validation_split = 0.2,
+      verbose = 0
+    )
+    
+    # Evaluate model:
+    tested_result <- tested_model %>% evaluate(x_test, y_test)
+    
+    # Add models to the main list of models
+    tested_model <- c(d[j], q[i], tested_result[[1]], tested_result[[2]])
+    All_Tested_Models <- rbind(All_Tested_Models, tested_model)
+  }
+}
+
+# Remove top row of NAs
+All_Tested_Models <- All_Tested_Models[-c(1),]
+# Renumber:
+row.names(All_Tested_Models) <- 1:nrow(All_Tested_Models)
+
+
+# Transform the data appropriately
+All_Tested_Models$q_value <- as.factor(All_Tested_Models[,'q'])
+All_Tested_Models$d_value <- as.factor(All_Tested_Models[,'d'])
+```
+
+
+## Heatmap of Models:
+
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+Loss.Heatmap <- ggplot(data = All_Tested_Models, 
+                       mapping = aes(x = q_value,
+                                     y = d_value,
+                                     fill = Loss)) +
+  geom_tile() +
+  geom_text(aes(label = 
+                  paste("Loss: \n", 
+                        round(Loss, 4), 
+                        "\nAccuracy:\n", 
+                        round(All_Tested_Models$Accuracy, 4))), 
+            color = "white") +
+  scale_fill_gradient(low = "palegreen3", high = "orange", trans = 'log' ) +
+  ggtitle("Heatmap of Hyperparameter Combinations",
+          subtitle = "Low Loss is Green, High Loss is Orange") +
+  ylab(label = "Hidden Layer Size (d)") + 
+  xlab(label = "Dropout Rate (q)")
+
+Loss.Heatmap
+```
+
+
+
+## Comments:
+
+From the heatmap, we may observe that the lowest LOSS (and highest Accuracy) occurs when a hidden layer size of $d=128$ and a dropout rate of $q=0.25$. Similar choices of $d$ and $q$ give similar values, but this combination is the lowest/best.
+
+Overall, this grid of values allows us to sample a small but substantive group of simple networks. It is very likely a superior selection of values exists between the values we have tested or with a similar combination. However, this selection of values covers a wide enough selection of models to enable us to find a model that performs relatively well.
+
+
+
+
+
+
+
+
+
+
+\pagebreak
+
+
+# Question 3
+
+> Trialling different optimizers
+
+
+## Momentum Optimal Optimizer:
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+## Define the model:
+model_3M <- keras_model_sequential() 
+model_3M %>% 
+  layer_dense(units = 128, activation = 'relu', input_shape = c(784)) %>%
+  layer_dropout(rate = 0.25) %>%
+  layer_dense(units = 10, activation = 'softmax')
+
+# Inspect the defined model:
+# summary(model_3M)
+
+# Compile the model with an appropriate Loss Function and Optimizer:
+model_3M %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = optimizer_sgd(momentum=0.9),
+  metrics = c('accuracy')
+)
+
+## Training and Fitting the model:
+history_3M <- model_3M %>% fit(
+  x_train, y_train, 
+  epochs = 30, batch_size = 128, 
+  validation_split = 0.2,
+  verbose = 0
+)
+
+momentum_result <- model_3M %>% evaluate(x_test, y_test)
+```
+
+
+
+## ADAM Optimal Optimizer:
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+## Define the model:
+model_3Ad <- keras_model_sequential() 
+model_3Ad %>% 
+  layer_dense(units = 128, activation = 'relu', input_shape = c(784)) %>%
+  layer_dropout(rate = 0.25) %>%
+  layer_dense(units = 10, activation = 'softmax')
+
+# Inspect the defined model:
+# summary(model_3Ad)
+
+# Compile the model with an appropriate Loss Function and Optimizer:
+model_3Ad %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = optimizer_adam(),
+  metrics = c('accuracy')
+)
+
+## Training and Fitting the model:
+history_3Ad <- model_3Ad %>% fit(
+  x_train, y_train, 
+  epochs = 30, batch_size = 128, 
+  validation_split = 0.2,
+  verbose = 0
+)
+
+ADAM_result <- model_3Ad %>% evaluate(x_test, y_test)
+```
+
+
+
+
+## RMSProp Optimal Optimizer:
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+## Define the model:
+model_3RMS <- keras_model_sequential() 
+model_3RMS %>% 
+  layer_dense(units = 128, activation = 'relu', input_shape = c(784)) %>%
+  layer_dropout(rate = 0.25) %>%
+  layer_dense(units = 10, activation = 'softmax')
+
+# Inspect the defined model:
+# summary(model_3RMS)
+
+# Compile the model with an appropriate Loss Function and Optimizer:
+model_3RMS %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+## Training and Fitting the model:
+history_3RMS <- model_3RMS %>% fit(
+  x_train, y_train, 
+  epochs = 30, batch_size = 128, 
+  validation_split = 0.2,
+  verbose = 0
+)
+
+RMS_result <- model_3RMS %>% evaluate(x_test, y_test)
+```
+
+
+
+## Comparison of Results:
+
+
+
+
+Plots:
+
+```{r echo = TRUE, message=FALSE, warning=FALSE}
+# Momentum Plot:
+
+plot_momentum <- plot(history_3M) + 
+  ggtitle("Momentum Optimizer History Plot:")
+
+
+# ADAM Plot:
+
+plot_ADAM <- plot(history_3Ad) + 
+  ggtitle("ADAM Optimizer History Plot:")
+
+
+# Momentum Plot:
+
+plot_RMSProp <- plot(history_3RMS) + 
+  ggtitle("RMSProp Optimizer History Plot:")
+
+
+
+# Plot them together:
+
+ggarrange(plot_momentum, 
+          plot_ADAM,
+          plot_RMSProp,
+          ncol = 1, nrow = 3)
+```
+
+
+
+Straight Results:
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+print(paste("The Momentum model has a validation loss value of: ", momentum_result[1]))
+
+print(paste("and it also has an accuracy of:", momentum_result[2]))
+
+
+print(paste("The ADAM model has a validation loss value of: ", ADAM_result[1]))
+
+print(paste("and it also has an accuracy of:", ADAM_result[2]))
+
+
+print(paste("The RMSProp model has a validation loss value of: ", RMS_result[1]))
+
+print(paste("and it also has an accuracy of:", RMS_result[2]))
+```
+
+
+
+## Comments:
+
+From the results of networks using these optimizers, we may observe that the most accurate model was the ADAM model, followed by the RMSProp and Momentum models. The lowest LOSS value however was the Momentum model, followed by the ADAM model. 
+
+If we observe the plots, it becomes evident that the ADAM and RMSProp models converge far more rapidly, with their validation accuracy plateauing after about 10 epochs. By contrast, the Momentum model takes longer to plateau, with obvious improvement still visible after 20 epochs. From this, we can say that the ADAM and RMSProp models converge the fastest. Combined with our knowledge of the final accuracy, the ADAM optimizer is the best choice in this situation.
+
+
+
+
+
+
+
+
+
+
