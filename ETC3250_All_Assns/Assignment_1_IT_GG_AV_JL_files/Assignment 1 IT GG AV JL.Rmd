@@ -1,0 +1,265 @@
+---
+title: "ETC3250 Assignment 1"
+date: "Tuesday 19/03/2019 before start of class"
+author: "Ian Tongs, Geethanjali Gangula, Avyav Vatsa, Jacob Low"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Read data
+possum <- readRDS(gzcon(url("http://monba.dicook.org/assignments/data/possum_magic.rds")))
+wombat <- readRDS(gzcon(url("http://monba.dicook.org/assignments/data/wombat_stew.rds")))
+
+# Load libraries
+library(caret)
+library(broom)
+library(tidyverse)
+library(GGally)
+```
+
+## Exercises
+
+**1. This question explores bias-variance trade-off. Read in the simulated data `possum_magic.rds`. This data is generated using the following function:**
+
+$$ y = 2x + 10sin(x) + \varepsilon, ~~\text{where}~~x\in [-10, 20], ~~\varepsilon\sim N(0, 4^2)$$
+
+**a. Make a plot of the data, overlaying the true model.**
+```{r echo=FALSE}
+# Plot the data and true model
+ggplot(possum, aes(x=x, y=y)) + geom_point(colour = "orange") +
+  geom_line(aes(y=2*x+10*sin(x)), colour="blue")
+```
+
+**b. Break the data into a $2/3$ training and a $1/3$ test set. (Hint: You can use the function `createDataPartition` from the `caret` package.) Fit a linear model, using the training set. Compute the training MSE and test MSE. Overlay the linear model fit on a plot of the data and true model.**
+```{r include=FALSE}
+# Create training and test sets
+set.seed(12032019)
+tr_indx <- createDataPartition(possum$y, times = 1, p=0.67)$Resample1
+tr <- possum[tr_indx,]
+ts <- possum[-tr_indx,]
+
+# Fit linear model
+fit1 <- lm(y ~ x, data=tr)
+tr_aug <- augment(fit1, tr)
+ts_aug <- augment(fit1, newdata=ts)
+ts_aug$.resid <- ts_aug$y - ts_aug$.fitted
+tr_mse <- sum((tr_aug$.resid)^2)/length(tr_aug)
+ts_mse <- sum((ts_aug$.resid)^2)/length(ts_aug)
+```
+
+```{r}
+tr_mse
+ts_mse
+```
+
+```{r echo=FALSE}
+# Plot the data, true model and fitted model
+ggplot(possum, aes(x=x, y=y)) + geom_point(colour = "blue") + 
+  geom_line(aes(y=2*x+10*sin(x)), colour="red") + 
+  geom_smooth(data=tr, method='lm',formula=y~x, se=FALSE, colour="green")
+```
+
+
+**c. Now examine the behaviour of the training and test MSE, for a `loess` fit.** 
+
+**i. Look up the `loess` model fit, and write a paragraph explaining how this fitting procedure works. In particular, explain what the `span` argument does.**
+    
+Loess stands for the “Local Polynomial Regression Fitting” and is primarily used to fit a polynomial surface with multiple regressions. Through this, loess can be smooth and can assist in predicting local y. Loess regression seeks to fit a line locally rather than trying to match constants so that the focus is more on the fitted curve as opposed to concentrating on individual constants overall. Span is virtually the width of x values that it fits for, whereby it is on control of the degree of smoothing for the model. The argument ‘span’ requires an input between 1 and 0, whereby increasing this span argument increases the smoothing of the curve. This, however, has an inverse effect on the flexibility of the fit. The smaller the span becomes, the more the model will conform to the data.
+
+**ii. Compute the training and test MSE for a range of `span` values, 0.5, 0.3, 0.2, 0.1, 0.05, 0.01. Plot the training and test MSE against the span parameter. (For each model, also make a plot of the data and fitted model, just for yourself, but not to hand in.)**
+```{r include=FALSE}
+#For 0.5
+fit05 <- loess(y~x, data=tr, span=0.5)
+tr_aug05 <- augment(fit05, tr)
+ts_aug05 <- augment(fit05, newdata=ts)
+ts_aug05$.resid <- ts_aug05$y - ts_aug05$.fitted
+tr_mse05 <- sum(tr_aug05$.resid*tr_aug05$.resid)/nrow(tr_aug05)
+ts_mse05 <- sum(ts_aug05$.resid*ts_aug05$.resid, na.rm=TRUE)/
+  length(ts_aug05$.resid[!is.na(ts_aug05$.resid)])
+
+#For 0.3
+fit03 <- loess(y~x, data=tr, span=0.3)
+tr_aug03 <- augment(fit03, tr)
+ts_aug03 <- augment(fit03, newdata=ts)
+ts_aug03$.resid <- ts_aug03$y - ts_aug03$.fitted
+tr_mse03 <- sum(tr_aug03$.resid*tr_aug03$.resid)/nrow(tr_aug03)
+ts_mse03 <- sum(ts_aug03$.resid*ts_aug03$.resid, na.rm=TRUE)/
+  length(ts_aug03$.resid[!is.na(ts_aug03$.resid)])
+
+#For 0.2
+fit02 <- loess(y~x, data=tr, span=0.2)
+tr_aug02 <- augment(fit02, tr)
+ts_aug02 <- augment(fit02, newdata=ts)
+ts_aug02$.resid <- ts_aug02$y - ts_aug02$.fitted
+tr_mse02 <- sum(tr_aug02$.resid*tr_aug02$.resid)/nrow(tr_aug02)
+ts_mse02 <- sum(ts_aug02$.resid*ts_aug02$.resid, na.rm=TRUE)/
+  length(ts_aug02$.resid[!is.na(ts_aug02$.resid)])
+
+#For 0.1
+fit01 <- loess(y~x, data=tr, span=0.1)
+tr_aug01 <- augment(fit01, tr)
+ts_aug01 <- augment(fit01, newdata=ts)
+ts_aug01$.resid <- ts_aug01$y - ts_aug01$.fitted
+tr_mse01 <- sum(tr_aug01$.resid*tr_aug01$.resid)/nrow(tr_aug01)
+ts_mse01 <- sum(ts_aug01$.resid*ts_aug01$.resid, na.rm=TRUE)/
+  length(ts_aug01$.resid[!is.na(ts_aug01$.resid)])
+
+#For 0.05
+fit005 <- loess(y~x, data=tr, span=0.05)
+tr_aug005 <- augment(fit005, tr)
+ts_aug005 <- augment(fit005, newdata=ts)
+ts_aug005$.resid <- ts_aug005$y - ts_aug005$.fitted
+tr_mse005 <- sum(tr_aug005$.resid*tr_aug005$.resid)/nrow(tr_aug005)
+ts_mse005 <- sum(ts_aug005$.resid*ts_aug005$.resid, na.rm=TRUE)/
+  length(ts_aug005$.resid[!is.na(ts_aug005$.resid)])
+
+#For 0.01
+fit001 <- loess(y~x, data=tr, span=0.01)
+tr_aug001 <- augment(fit001, tr)
+ts_aug001 <- augment(fit001, newdata=ts)
+ts_aug001$.resid <- ts_aug001$y - ts_aug001$.fitted
+tr_mse001 <- sum(tr_aug001$.resid*tr_aug001$.resid)/nrow(tr_aug001)
+ts_mse001 <- sum(ts_aug001$.resid*ts_aug001$.resid, na.rm=TRUE)/
+  length(ts_aug001$.resid[!is.na(ts_aug001$.resid)])
+```
+
+
+```{r echo=FALSE}
+#Creating Graph:
+span <- c(0.5,0.3,0.2,0.1,0.05,0.01)
+# #span
+TestMSE <- c(ts_mse05,ts_mse03,ts_mse02,ts_mse01,ts_mse005,ts_mse001)
+# #TestMSE
+TrainingMSE <- c(tr_mse05,tr_mse03,tr_mse02,tr_mse01,tr_mse005,tr_mse001)
+# #TrainingMSE
+LoessErrors <- data.frame(span,TestMSE,TrainingMSE)
+#LoessErrors
+LoessErrorsLong <- gather(data=LoessErrors, 
+                        key=StatType, 
+                        value=Value, 
+                        TestMSE,TrainingMSE)
+
+ggplot(LoessErrorsLong, aes(x=span, y=Value, colour=StatType)) + geom_point() + geom_line()
+```
+
+**iii. Write a paragraph explaining the effect of increasing the flexibility of the fit has on the training and test MSE. Indicate what you think is the optimal span value for this data.**
+
+The main effect of increasing the flexibility of the fit is that it essentially gives more degrees of freedom to the training data. Increasing the flexibility will reduce the bias and impact the variance, the rate of change of which, will allow us to determine the impact on the test MSE (increase or decrease). The optimal point is one where the test MSE and training MSE are minimised, whereby the best model required low variance and low bias. In saying this, to find the best mode, we must assess where there is a suitable balance of both. This notion is called the bias-variance trade-off. Excessive bias will lead to problems as the model is over simplified and the training data is not well captured and too much variance will demonstrate that data is too spread out not giving a good fit. From observation of the below graph in part d, it is safe to say the optimal span value for this data is 0.1.
+
+**d. Now examine the relationship between bias, variance and MSE. Compute the bias, MSE and hence variance, for the test set, from the fitted loess models using the `span=0.5, 0.3, 0.2, 0.1, 0.05, 0.01`. Plot these quantities: MSE, bias, variance against span. Write a few sentences explaining what you learn.**
+
+In the graph below, we can see the Test MSE statistic declines with reduced flexibility (increased span = reduced flexibility as discussed prior) with Bias roughly mirroring the decrease in Test MSE. Meanwhile, the Variance is primarily constant apart from when flexibility is highest where it increases slightly. According to what is presented in the textbook [3], this indicates that the true function is highly non-linear, which may be considered accurate when considering the highly cyclical nature of the data provided.
+
+```{r include=FALSE}
+#For Span=0.5
+ts_bias05 <- sum((ts_aug05$.fitted - ts_aug05$true)^2, na.rm=TRUE)/
+  length(ts_aug05$.resid^2[!is.na(ts_aug05$.resid)])
+ts_var05 <- ts_mse05 - (ts_bias05)
+
+#For Span=0.3
+ts_bias03 <- sum((ts_aug03$.fitted - ts_aug03$true)^2, na.rm=TRUE)/
+  length(ts_aug03$.resid^2[!is.na(ts_aug03$.resid)])
+ts_var03 <- ts_mse03 - (ts_bias03)
+
+#For Span=0.2
+ts_bias02 <- sum((ts_aug02$.fitted - ts_aug02$true)^2, na.rm=TRUE)/
+  length(ts_aug02$.resid^2[!is.na(ts_aug02$.resid)])
+ts_var02 <- ts_mse02 - (ts_bias02)
+
+#For Span=0.1
+ts_bias01 <- sum((ts_aug01$.fitted - ts_aug01$true)^2, na.rm=TRUE)/
+  length(ts_aug01$.resid^2[!is.na(ts_aug01$.resid)])
+ts_var01 <- ts_mse01 - (ts_bias01)
+
+#For Span=0.05
+ts_bias005 <- sum((ts_aug005$.fitted - ts_aug005$true)^2, na.rm=TRUE)/
+  length(ts_aug005$.resid^2[!is.na(ts_aug005$.resid)])
+ts_var005 <- ts_mse005 - (ts_bias005)
+
+#For Span=0.01
+ts_bias001 <- sum((ts_aug001$.fitted - ts_aug001$true)^2, na.rm=TRUE)/
+  length(ts_aug001$.resid^2[!is.na(ts_aug001$.resid)])
+ts_var001 <- ts_mse001 - (ts_bias001)
+```
+
+```{r echo=FALSE}
+#Creating Graph:
+span <- c(0.5,0.3,0.2,0.1,0.05,0.01)
+# #span
+TestMSE <- c(ts_mse05,ts_mse03,ts_mse02,ts_mse01,ts_mse005,ts_mse001)
+# #TestMSE
+TrainingMSE <- c(tr_mse05,tr_mse03,tr_mse02,tr_mse01,tr_mse005,tr_mse001)
+# #TrainingMSE
+Bias <- c(ts_bias05, ts_bias03, ts_bias02, ts_bias01, ts_bias005, ts_bias001)
+# #Bias
+Variance <- c(ts_var05, ts_var03, ts_var02, ts_var01, ts_var005, ts_var001)
+# #Variance
+LoessErrors1 <- data.frame(span,TestMSE,TrainingMSE,Bias,Variance)
+#LoessErrors
+LoessErrorsLong1 <- gather(data=LoessErrors1, 
+                        key=StatType, 
+                        value=Value, 
+                        TestMSE,
+                        TrainingMSE,
+                        Bias,
+                        Variance)
+
+ggplot(LoessErrorsLong1, aes(x=span, y=Value, colour=StatType)) + geom_point() + geom_line()
+```
+
+**2. Using the simulated data set, `wombat_stew.rds`, answer the following questions.**
+
+**a. Fit a linear model, using both `lm` and `glm`. Make a summary of the model fit, and you will see that they are different: `lm` reports $R^2$ but `glm` reports `deviance`. What is the relationship between these two goodness of fit statistics? Explain it, and write the R code that shows $R^2$ can be computed from the `deviance`.**
+
+$R^2$ is a statistical measure which measures how close the data is to the fitted regression line where it ranges from 0 to 1 where the larger the value, the better fit there is [4]. Deviance is a measure of goodness of fit for a generalised linear model. R reports two forms of deviance; the null deviance and the residual deviance [5].The null deviance shows how well the response variable is predicted by a model that includes only the intercept whereas residual with inclusion of independent variables. The relationship between these two is that $R^2$ = Residual Deviance - Null Deviance. As below, it can be seen that the $R^2$ for the linear model is the same for the generalised linear model when calculated.
+```{r echo=FALSE}
+fit1 <- lm(formula = y ~ x1 + x2 + x3 , data=wombat)
+fit2 <- glm(formula = y ~ x1 + x2 + x3, data=wombat)
+summary(fit1)
+summary(fit2)
+```
+
+```{r}
+1- fit2$deviance/fit2$null.deviance
+```
+
+**b. Make a plot of the residuals from the model against each predictor. Overlay a smoother on each.  (Hint: The `ggduo` function from the GGally package can be useful here. You can plot a single $Y$ variable against multiple $X$ variables.) Explain why the linear model may not be appropriate for this data.**
+
+The data is very scattered and has a lot of variance, the linear model shows that it could be inappropriate for this data as for x3, there is a non-random inverted U pattern. This suggests a better fit for a non-linear model.
+```{r include=FALSE}
+wombat_aug1 <- augment(fit1, wombat)
+```
+
+```{r echo=FALSE}
+ggduo(wombat_aug1, columnsX=c("x1", "x2", "x3"), columnsY = ".std.resid")
+```
+
+**c. Explore adding polynomial terms for each or all predictors, to produce the best possible model fit. Report your best $R^2$, the final fitted model, and the residual vs predictor plots.**
+
+The best possible model we found is $$y = x1^2 + x1 + x2^3 + x2 + x3^2 + x3$$
+The $R^2$ is listed below, indicating that the model explains 98.6% of the variability of the data around its mean.
+```{r echo=FALSE}
+fit3 <- lm(y~I(x1^2) + x1 +I(x2^3) + x2 + I(x3^2) + x3, data=wombat)
+summary(fit3)$r.squared
+```
+
+```{r include=FALSE}
+wombat_aug3 <- augment(fit3, wombat)
+```
+
+```{r echo=FALSE}
+ggduo(wombat_aug3, columnsX=c("x1", "x2", "x3"), columnsY = ".std.resid")
+```
+
+# References
+[1]: James, G., Witten D., Hastie, T. and Tibshirani, R. (2013) *An Introduction to Statistical Learning with Applications in R.* New York: Springer Science+Business Media, pp. 294-300.
+
+[2]: Prabhakaran, S. (2017). *Loess Regression and Smoothing With R.* [online] R-statistics.co. Available at: http://r-statistics.co/Loess-Regression-With-R.html [Accessed 17 Mar.
+
+[3]: James, G., Witten D., Hastie, T. and Tibshirani, R. (2013) *An Introduction to Statistical Learning with Applications in R.* New York: Springer Science+Business Media, pp. 35-36
+
+[4]: Editor, M. (2019). *Regression Analysis: How Do I Interpret R-squared and Assess the Goodness-of-Fit?.* [online] Blog.minitab.com. Available at: http://blog.minitab.com/blog/adventures-in-statistics-2/regression-analysis-how-do-i-interpret-r-squared-and-assess-the-goodness-of-fit [Accessed 17 Mar. 2019].
+
+[5]: The Analysis Factor. (2019). *Generalized Linear Models in R, Part 2: Understanding Model Fit in Logistic Regression Output - The Analysis Factor.* [online] Available at: https://www.theanalysisfactor.com/r-glm-model-fit/ [Accessed 17 Mar. 2019].
+
